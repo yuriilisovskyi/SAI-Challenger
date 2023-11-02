@@ -224,16 +224,36 @@ class Sai():
 
     def set_loglevel(self, sai_api, loglevel):
         return self.sai_client.set_loglevel(sai_api, loglevel)
+    
+    def log_attr_use(self, obj, attrs, op):
+        obj_name = obj
+        if type(obj) == SaiObjType:
+            obj_name = "SAI_OBJECT_TYPE_" + obj.name
+        elif type(obj) == str:
+            if obj.startswith("oid:"):
+                obj_name = self.vid_to_type(obj)
+            else:
+                obj_name = obj.split(":")[0]
+        if "bulk" in op:
+            for attr_grp in attrs:
+                for attr in attr_grp[::2]:
+                    SaiAttrsJsonLogger.insert_attr_use(obj_name, attr, op)
+        else:
+            for attr in attrs[::2]:
+                SaiAttrsJsonLogger.insert_attr_use(obj_name, attr, op)
 
     # CRUD
     def create(self, obj, attrs=[], do_assert=True):
+        self.log_attr_use(obj, attrs, "create")
         return self.sai_client.create(obj, attrs, do_assert)
 
     def remove(self, obj, do_assert=True):
+        self.log_attr_use(obj, [], "remove")
         return self.sai_client.remove(obj, do_assert)
 
     def set(self, obj, attr, do_assert=True):
         assert len(attr) == 2, f"Failed to set {attr}. Only one attribute can be set at a time!"
+        self.log_attr_use(obj, attr, "set")
         return self.sai_client.set(obj, attr, do_assert)
 
     def get(self, obj, attrs, do_assert=True):
@@ -242,7 +262,7 @@ class Sai():
             attr = attrs[0]
             attr_type = self.get_obj_attr_type(obj_type, attr)
             status, data = self.get_by_type(obj, attr, attr_type)
-            SaiAttrsJsonLogger.insert_attr_use(obj_type, attr, "get")
+            self.log_attr_use(obj_type, [attr], "get")
             if do_assert:
                 assert status == "SAI_STATUS_SUCCESS", f"Failed to retrieve {attr}: {status}"
                 return data
@@ -252,12 +272,15 @@ class Sai():
 
     # BULK
     def bulk_create(self, obj_type, keys, attrs, obj_count=0, do_assert=True):
+        self.log_attr_use(obj_type, attrs, "bulk_create")
         return self.sai_client.bulk_create(obj_type, keys, attrs, obj_count, do_assert)
 
     def bulk_remove(self, obj_type, keys, do_assert=True):
+        self.log_attr_use(obj_type, [], "bulk_remove")
         return self.sai_client.bulk_remove(obj_type, keys, do_assert)
 
     def bulk_set(self, obj_type, keys, attrs, do_assert=True):
+        self.log_attr_use(obj_type, attrs, "bulk_set")
         return self.sai_client.bulk_set(obj_type, keys, attrs, do_assert)
 
     # Stats
